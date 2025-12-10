@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="나만의 바다를 꾸미며 쉬어가는 방치형 클리커 게임입니다. 화면을 클릭해 물방울 포인트를 모으고 상점·투두리스트·타이머를 함께 띄워 작업하면서 바다가 자라나는 모습을 감상하세요.">
+<title>나만의 바다 만들기</title>
+
+<style>
+  /* Escoredream Regular (상점, 점수판 기본, +10 텍스트) */
+  @font-face {
+    font-family: 'Escoredream';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_six@1.2/S-CoreDream-4Regular.woff') format('woff');
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  /* Escoredream ExtraBold (시계) */
+  @font-face {
+    font-family: 'EscoredreamBold';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_six@1.2/S-CoreDream-7ExtraBold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+  }
+
+  :root{
+    --text:#ffffff;
+    --muted:rgba(255,255,255,.8);
+    --panel-bg:rgba(8,40,90,0.82);
+    --panel-bg-light:rgba(8,40,90,0.76);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{
+    height:100%;
+    overflow:hidden;
+    font-family:"Escoredream", ui-sans-serif, system-ui;
+    background:linear-gradient(to bottom,#66b8ff 0%,#2a97ff 45%,#0074d1 100%);
+    color:var(--text);
+  }
+
+  #webgl{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+    z-index:0;
+  }
+
+  .icon-water{
+    width:22px;height:22px;
+    vertical-align:middle;margin-right:6px;
+  }
+  .icon-water-big{
+    width:30px;height:30px;
+    vertical-align:middle;margin-right:8px;
+  }
+
+  .aurora{
+    position:fixed; inset:0; z-index:2; pointer-events:none;
+    mix-blend-mode:screen; opacity:0.9;
+    background:
+      radial-gradient(circle at -10% -10%, rgba(255,180,255,0.65) 0%, rgba(180,90,255,0.38) 20%, rgba(110,40,210,0.25) 40%, rgba(40,10,120,0.05) 70%, transparent 100%),
+      linear-gradient(to bottom, rgba(110,50,210,0.25) 0%, rgba(80,40,190,0.12) 25%, rgba(40,20,120,0.05) 50%, transparent 100%);
+    filter: blur(18px);
+    animation: auroraFloat 18s ease-in-out infinite alternate;
+  }
+  @keyframes auroraFloat{
+    0%{ transform:translateX(0) translateY(0); opacity:.92; }
+    50%{ transform:translateX(2%) translateY(1.8%); opacity:1; }
+    100%{ transform:translateX(-1.4%) translateY(0); opacity:.9; }
+  }
+
+  .ui-layer{
+    position:relative;
+    width:100%;
+    height:100vh;
+    pointer-events:none;
+    z-index:5;
+  }
+
+  /* 도크 버튼 */
+  .dock{
+    position:absolute;
+    top:20px;
+    left:20px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    pointer-events:auto;
+    z-index:6;
+  }
+  .dock button{
+    width:48px;
+    height:48px;
+    border:none;
+    border-radius:999px;
+    background:var(--panel-bg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:transform .12s, filter .12s, background .12s;
+    font-family:"Escoredream", system-ui;
+  }
+  .dock button:hover{
+    transform:translateY(-1px);
+    filter:brightness(1.05);
+  }
+  .dock svg{
+    width:22px;
+    height:22px;
+    fill:#ffffff;
+  }
+
+  /* 치트 버튼 (이모지 → 흰색 키 아이콘 SVG) */
+  .cheat-btn{
+    position:fixed;
+    top:10px;
+    right:16px;
+    width:30px;
+    height:30px;
+    border-radius:50%;
+    border:1px solid rgba(255,255,255,0.45);
+    background:rgba(4,25,70,0.6);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    z-index:7;
+    opacity:0.55;
+    transition:opacity .15s, transform .15s, background .15s;
+    pointer-events:auto;
+  }
+  .cheat-btn:hover{
+    opacity:0.9;
+    transform:translateY(-1px);
+    background:rgba(8,40,90,0.8);
+  }
+  .cheat-btn svg{
+    width:17px;
+    height:17px;
+    stroke:#ffffff;
+    stroke-width:1.8;
+    fill:none;
+  }
+
+  .meter{
+    position:absolute;
+    left:50%;
+    top:6vh;
+    transform:translateX(-50%);
+    text-align:center;
+    pointer-events:auto;
+  }
+
+  .clock{
+    font-family:'EscoredreamBold', system-ui;
+    font-weight:700;
+    font-size:clamp(32px, 6vw, 64px);
+    font-variant-numeric:tabular-nums;
+  }
+
+  .score-text{
+    margin-top:6px;
+    font-family:'Escoredream', system-ui;
+    font-weight:400;
+    font-size:clamp(18px,3vw,26px);
+    text-shadow:0 1px 8px rgba(0,0,0,.3);
+  }
+  #score{
+    font-family:'Escoredream', system-ui;
+    font-weight:400;
+  }
+
+  .click-gains{
+    position:relative;
+    width:100%;
+    height:40px;
+    margin-top:4px;
+    overflow:visible;
+    pointer-events:none;
+    font-family:'Escoredream', system-ui;
+  }
+  .click-gain{
+    position:absolute;
+    left:50%;
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size:16px;
+    font-weight:700;
+    transform:translate(-50%, 16px);
+    opacity:1;
+    text-shadow:0 1px 4px rgba(0,0,0,.35);
+    animation:clickGainFloat .7s ease-out forwards;
+  }
+  .click-gain img{
+    width:18px;
+    height:18px;
+    margin:0;
+  }
+  @keyframes clickGainFloat{
+    0%{ opacity:1; transform:translate(-50%, 12px); }
+    100%{ opacity:0; transform:translate(-50%, -12px); }
+  }
+
+  /* 인트로 / 치트 팝업 공통 */
+  .intro-overlay,
+  .cheat-overlay{
+    position:fixed;
+    inset:0;
+    z-index:50;
+    background:rgba(0,0,20,0.55);
+    backdrop-filter:blur(10px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .intro-overlay.hidden{
+    opacity:0;
+    pointer-events:none;
+    transition:.25s ease;
+  }
+  .cheat-overlay{
+    display:none;
+  }
+  .cheat-overlay.open{
+    display:flex;
+  }
+  .intro-modal{
+    width:min(530px,94vw);
+    background:rgba(8,30,70,0.92);
+    padding:32px 34px 32px;
+    border-radius:12px;
+    border:none;
+    box-shadow:none;
+    word-break:keep-all;
+  }
+  /* 치트 팝업은 살짝 더 작게 */
+  .cheat-overlay .intro-modal{
+    width:min(380px,90vw);
+    padding:22px 24px 24px;
+  }
+  .intro-title{
+    font-size:20px;
+    font-weight:700;
+    margin-bottom:20px;
+  }
+  .intro-text{
+    font-size:14.2px;
+    line-height:1.8;
+    font-weight:300;
+    white-space:pre-line;
+    margin-bottom:40px;
+  }
+  /* 치트 팝업 텍스트만 가운데 정렬 */
+  .cheat-overlay .intro-text{
+    text-align:center;
+    margin-bottom:28px;
+  }
+  .intro-actions{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+  }
+  .intro-btn{
+    padding:10px 26px;
+    border:none;
+    border-radius:999px;
+    font-size:14px;
+    cursor:pointer;
+    background:#ffffff;
+    color:#003a73;
+    font-weight:600;
+    transition:all .15s ease;
+  }
+  .intro-btn:hover{
+    background:#003a73;
+    color:white;
+  }
+  .intro-btn-secondary{
+    background:transparent;
+    color:#ffffff;
+    border:1px solid rgba(255,255,255,0.75);
+  }
+  .intro-btn-secondary:hover{
+    background:#ffffff;
+    color:#003a73;
+  }
+
+  .popup{
+    position:absolute;
+    top:88px;
+    left:20px;
+    z-index:10;
+    width:min(380px, calc(100vw - 40px));
+    background:rgba(5,40,90,.75);
+    border:1px solid rgba(255,255,255,.35);
+    border-radius:16px;
+    backdrop-filter:blur(10px);
+    box-shadow:0 18px 48px rgba(0,0,0,.35);
+    display:none;
+    pointer-events:auto;
+    font-family:'Escoredream', system-ui;
+  }
+  .popup.open{ display:block; }
+  .pop-hd{
+    padding:12px 14px;
+    border-bottom:none; /* 상단 흰색 테두리 제거 */
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    cursor:move;
+    user-select:none;
+  }
+  .pop-title{ font-weight:700; }
+  .pop-close{
+    background:none;
+    border:none;
+    font-size:18px;
+    color:#fff;
+    cursor:pointer;
+    font-family:'Escoredream', system-ui;
+  }
+
+  /* 상점 리스트 */
+  .goods{
+    padding:14px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    max-height:320px;           /* 4개 정도 보이도록 높이 제한 */
+    overflow-y:auto;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(255,255,255,0.8) transparent;
+  }
+  .goods::-webkit-scrollbar{
+    width:7px;
+  }
+  .goods::-webkit-scrollbar-track{
+    background:transparent;
+  }
+  .goods::-webkit-scrollbar-thumb{
+    background:rgba(255,255,255,0.8); /* 약 80% 불투명 흰색 */
+    border-radius:999px;
+  }
+
+  .item{
+    padding:10px 12px;
+    background:rgba(6,30,73,0.78);
+    border-radius:12px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    cursor:pointer;
+    transition:transform .12s, filter .12s;
+    font-family:'Escoredream', system-ui;
+  }
+  .item:hover{
+    transform:translateY(-2px);
+    filter:brightness(1.05);
+  }
+  .item-left{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .item-icon{
+    width:52px;
+    height:52px;
+    border-radius:9px;
+    object-fit:cover;
+    background:rgba(255,255,255,0.08);
+  }
+  .item-text{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .item-title{
+    font-size:15px;
+    font-weight:700;
+  }
+  .item-sub{
+    font-size:12px;
+    opacity:0.85;
+  }
+  .item-right{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:2px;
+  }
+  .item-price{
+    display:flex;
+    align-items:center;
+    font-size:14px;
+    font-weight:700;
+  }
+  .water-icon{
+    width:18px;
+    height:18px;
+    background:url("water.png") center/contain no-repeat;
+    display:inline-block;
+    margin-left:4px;
+  }
+  .item-ability{
+    display:flex;
+    align-items:center;
+    font-size:12px;
+    opacity:0.92;
+  }
+  .item-ability .water-icon{
+    width:16px;
+    height:16px;
+    margin-left:4px;
+  }
+  .item.owned{
+    opacity:.45;
+    pointer-events:none;
+  }
+  .item.locked{
+    opacity:.35;
+    filter:grayscale(.5);
+    pointer-events:none;
+  }
+
+  /* 공통 패널 헤더 */
+  .panel-header,
+  .memo-header,
+  .todo-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    cursor:move;
+    user-select:none;
+  }
+  .panel-header-left,
+  .memo-header-left,
+  .todo-header-left{
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+  .panel-header-right,
+  .memo-header-right,
+  .todo-header-right{
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+  .panel-title,
+  .memo-title,
+  .todo-title{
+    font-size:15px;
+  }
+  /* 오늘할일 제목은 살짝 더 크게 */
+  .todo-title{
+    font-size:16px;
+  }
+  .panel-title[contenteditable="true"],
+  .memo-title[contenteditable="true"],
+  .todo-title[contenteditable="true"]{
+    outline:none;
+    border-bottom:1px solid rgba(255,255,255,.6);
+  }
+  .panel-icon-btn{
+    border:none;
+    background:none;
+    color:#ffffff;
+    font-size:14px;
+    cursor:pointer;
+    padding:2px 4px;
+  }
+
+  /* 타이머 패널 */
+  .timer-panel{
+    position:absolute;
+    top:120px;
+    right:40px;
+    width:360px;
+    background:var(--panel-bg-light);
+    border-radius:12px;
+    padding:10px 16px 16px;
+    pointer-events:auto;
+    z-index:20;
+    color:#ffffff;
+  }
+  .timer-panel.collapsed{
+    width:240px;
+    padding:6px 12px 8px;
+  }
+  .timer-panel.collapsed .timer-body{
+    display:none;
+  }
+  .timer-header{
+    margin-bottom:8px;
+  }
+  .timer-display{
+    font-family:'EscoredreamBold', system-ui;
+    font-size:40px;
+    text-align:center;
+    margin:10px 0 8px;
+  }
+  .timer-controls{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    margin-top:8px;
+  }
+  .timer-btn-circle{
+    width:46px;
+    height:46px;
+    border-radius:50%;
+    border:none;
+    background:rgba(255,255,255,0.12);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:transform .12s, background .12s;
+  }
+  .timer-btn-circle:hover{
+    transform:translateY(-1px);
+    background:rgba(255,255,255,0.2);
+  }
+  .timer-btn-icon{
+    font-size:17px;
+    line-height:1;
+    color:#ffffff;
+  }
+
+  /* 메모 패널 */
+  .memo-panel{
+    position:absolute;
+    top:200px;
+    left:80px;
+    width:260px;
+    background:var(--panel-bg-light);
+    border-radius:12px;
+    padding:8px 12px 10px;
+    color:#ffffff;
+    pointer-events:auto;
+    z-index:19;
+  }
+  .memo-panel.collapsed .memo-body{
+    display:none;
+  }
+  .memo-header{
+    margin-bottom:8px;
+  }
+  .memo-body textarea{
+    width:100%;
+    min-height:90px;
+    resize:none;
+    border:none;
+    border-radius:8px;
+    padding:8px 9px;
+    font-family:'Escoredream', system-ui;
+    font-size:13px;
+    background:rgba(255,255,255,0.12);
+    color:#ffffff;
+  }
+  .memo-body textarea::placeholder{
+    color:rgba(255,255,255,0.65);
+  }
+  .memo-body textarea:focus{
+    outline:1px solid rgba(255,255,255,0.7);
+  }
+  .memo-count{
+    margin-top:4px;
+    font-size:11px;
+    text-align:right;
+    color:rgba(255,255,255,0.75);
+  }
+
+  /* 체크리스트 패널 (오늘할일 리스트) */
+  .todo-panel{
+    position:absolute;
+    top:260px;
+    left:180px;
+    width:340px; /* 조금 더 크게 */
+    background:var(--panel-bg-light);
+    border-radius:12px;
+    padding:10px 14px 12px;
+    color:#ffffff;
+    pointer-events:auto;
+    z-index:18;
+  }
+  .todo-panel.collapsed .todo-body{
+    display:none;
+  }
+  .todo-header{
+    margin-bottom:14px; /* 제목 아래 간격 늘림 */
+  }
+  .todo-body{
+    margin-top:14px;     /* 제목과 체크리스트 사이 간격 추가 */
+  }
+  .todo-items{
+    display:flex;
+    flex-direction:column;
+    gap:10px;        /* 항목 간 간격 */
+    margin-bottom:8px;
+  }
+  .todo-item{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+  }
+  .todo-item input[type="checkbox"]{
+    width:18px;
+    height:18px;
+    accent-color:#ffffff;
+    cursor:pointer;
+    margin-top:3px;
+    flex-shrink:0;
+  }
+  .todo-text{
+    flex:1;
+    font-size:14px;
+    min-height:22px;
+    padding:6px 8px;
+    border-radius:6px;
+    background:rgba(255,255,255,0.08);
+    line-height:1.6;
+    color:rgba(255,255,255,0.87);
+  }
+  .todo-text[contenteditable="true"]:focus{
+    outline:1px solid rgba(255,255,255,0.7);
+  }
+  .todo-del{
+    border:none;
+    background:none;
+    color:#ffffff;
+    font-size:13px;
+    cursor:pointer;
+    padding:0 2px;
+    flex-shrink:0;
+  }
+  .todo-add{
+    width:100%;
+    border:none;
+    border-radius:8px;
+    padding:6px 0;
+    font-size:13px;
+    cursor:pointer;
+    background:rgba(255,255,255,0.16);
+    color:#ffffff;
+  }
+  .todo-add:hover{
+    background:rgba(255,255,255,0.22);
+  }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+
+<body>
+...
+</body>
+</html>
+<!-- 인트로 -->
+<div class="intro-overlay" id="introOverlay">
+  <div class="intro-modal">
+    <div class="intro-title">나만의 바다, 방치형 클리커 게임</div>
+    <div class="intro-text">
+이 사이트는 나만의 바다를 키워가는 방치형 + 클리커 게임입니다.
+화면을 클릭해 물방울 포인트를 모으고 여러 오브제를 구매해 
+바다를 점점 채워가세요.
+
+페이지를 켜두기만 해도 시간이 흐를수록 포인트가 자동으로 쌓입니다.
+사이트 내의 투두리스트와 타이머 등을 함께 띄워두고,
+작업하는 동안 천천히 자라는 나만의 바다를 지켜보세요.
+    </div>
+    <div class="intro-actions">
+      <button class="intro-btn" id="introStart">바다로 들어가기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 치트 팝업 -->
+<div class="cheat-overlay" id="cheatOverlay">
+  <div class="intro-modal">
+    <div class="intro-text">
+99999999 물 포인트를 즉시 충전하시겠습니까?
+    </div>
+    <div class="intro-actions">
+      <button class="intro-btn" id="cheatConfirm">확인</button>
+      <button class="intro-btn intro-btn-secondary" id="cheatCancel">아니오</button>
+    </div>
+  </div>
+</div>
+
+<div class="aurora"></div>
+<canvas id="webgl"></canvas>
+
+<!-- 치트 버튼 (흰색 키 아이콘) -->
+<button class="cheat-btn" id="cheatBtn" aria-label="cheat">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="9" cy="10" r="4"></circle>
+    <path d="M13 10h7v3h-2v2h-2v2h-3"></path>
+  </svg>
+</button>
+
+<div class="ui-layer">
+  <!-- 도크 버튼들 -->
+  <div class="dock">
+    <!-- 상점 -->
+    <button id="btnShop">
+      <svg viewBox="0 0 24 24">
+        <path d="M4 10v9h6v-5h4v5h6v-9l-8-6-8 6z"/>
+      </svg>
+    </button>
+    <!-- 메모 -->
+    <button id="btnMemo">
+      <svg viewBox="0 0 24 24">
+        <path d="M6 3h12a1 1 0 0 1 1 1v10.5L14.5 21H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm8 12h4l-4 4v-4zM8 7h8v2H8V7zm0 4h6v2H8v-2z"/>
+      </svg>
+    </button>
+    <!-- 체크리스트 -->
+    <button id="btnTodo">
+      <svg viewBox="0 0 24 24">
+        <path d="M4 5h2.5L8 7.5 6.5 9 4 6.5V5zm5 1h11v2H9V6zm0 5h11v2H9v-2zm0 5h11v2H9v-2zm-5-4h2.5L8 14.5 6.5 16 4 13.5V12zm0 5h2.5L8 19.5 6.5 21 4 18.5V17z"/>
+      </svg>
+    </button>
+    <!-- 타이머 -->
+    <button id="btnTimer">
+      <svg viewBox="0 0 24 24">
+        <path d="M9 2h6v2H9V2zm3 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm0 2a6 6 0 1 0 .01 12.01A6 6 0 0 0 12 8zm-.5 2h1.5v4.25l2.5 2.5-1.06 1.06L11.5 15V10z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- 시계 & 점수 -->
+  <div class="meter">
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="score-text">
+      <img src="water.png" class="icon-water-big" alt="">
+      <span id="score">00000000</span>
+    </div>
+    <div id="clickGains" class="click-gains"></div>
+  </div>
+
+  <!-- 상점 팝업 -->
+  <div class="popup" id="shopPopup">
+    <div class="pop-hd">
+      <div class="pop-title">상점</div>
+      <button class="pop-close" id="shopClose">✕</button>
+    </div>
+    <div class="goods" id="goods">
+      <!-- 산호 -->
+      <div class="item" data-key="coral" data-price="100">
+        <div class="item-left">
+          <img src="coral.png" class="item-icon" alt="coral">
+          <div class="item-text">
+            <div class="item-title">산호</div>
+            <div class="item-sub">구매 가능</div>
+          </div>
+        </div>
+        <div class="item-right">
+          <div class="item-price">
+            100 <span class="water-icon"></span>
+          </div>
+          <div class="item-ability">
+            1분마다 +50<span class="water-icon"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 해초 -->
+      <div class="item locked" data-key="seaweed" data-price="300">
+        <div class="item-left">
+          <img src="seaweed.png" class="item-icon" alt="seaweed">
+          <div class="item-text">
+            <div class="item-title">해초</div>
+            <div class="item-sub">산호 구매 필요</div>
+          </div>
+        </div>
+        <div class="item-right">
+          <div class="item-price">
+            300 <span class="water-icon"></span>
+          </div>
+          <div class="item-ability">
+            클릭 시 +5<span class="water-icon"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 흰동가리 -->
+      <div class="item locked" data-key="fish" data-price="800">
+        <div class="item-left">
+          <img src="fish.png" class="item-icon" alt="fish">
+          <div class="item-text">
+            <div class="item-title">흰동가리</div>
+            <div class="item-sub">해초 구매 필요</div>
+          </div>
+        </div>
+        <div class="item-right">
+          <div class="item-price">
+            800 <span class="water-icon"></span>
+          </div>
+          <div class="item-ability">
+            30초마다 +30<span class="water-icon"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 블루탱 -->
+      <div class="item locked" data-key="bluetang" data-price="1600">
+        <div class="item-left">
+          <img src="bluetang.png" class="item-icon" alt="bluetang">
+          <div class="item-text">
+            <div class="item-title">블루탱</div>
+            <div class="item-sub">흰동가리 구매 필요</div>
+          </div>
+        </div>
+        <div class="item-right">
+          <div class="item-price">
+            1600 <span class="water-icon"></span>
+          </div>
+          <div class="item-ability">
+            30초마다 +40<span class="water-icon"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 옐로탱 -->
+      <div class="item locked" data-key="yellowtang" data-price="2600">
+        <div class="item-left">
+          <img src="yellowtang.png" class="item-icon" alt="yellowtang">
+          <div class="item-text">
+            <div class="item-title">옐로탱</div>
+            <div class="item-sub">블루탱 구매 필요</div>
+          </div>
+        </div>
+        <div class="item-right">
+          <div class="item-price">
+            2600 <span class="water-icon"></span>
+          </div>
+          <div class="item-ability">
+            1분마다 +100<span class="water-icon"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 깃대돔 -->
+      <div class="item locked" data-key="moorishidol" data-price="4000">
+        <div class="item-left">
+          <!-- 깃대돔 아이콘 파일명: moorishidol.png -->
+          <img src="moorishidol.png" class="item-icon" alt="moorishidol">
+          <div class="item-text">
+            <div class="item-title">깃대돔</div>
+            <div class="item-sub">옐로탱 구매 필요</div>
+          </div>
+        </div>
+        <div class="item-right">
+          <div class="item-price">
+            4000 <span class="water-icon"></span>
+          </div>
+          <div class="item-ability">
+            1분마다 +150<span class="water-icon"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 해파리 -->
+      <div class="item locked" data-key="jellyfish" data-price="6000">
+        <div class="item-left">
+          <img src="jellyfish.png" class="item-icon" alt="jellyfish">
+          <div class="item-text">
+            <div class="item-title">해파리</div>
+            <div class="item-sub">깃대돔 구매 필요</div>
+          </div>
+        </div>
+        <div class="item-right">
+          <div class="item-price">
+            6000 <span class="water-icon"></span>
+          </div>
+          <div class="item-ability">
+            클릭 시 +15<span class="water-icon"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 타이머 패널 -->
+  <div class="timer-panel" id="timerPanel" style="display:none;">
+    <div class="panel-header timer-header" id="timerHeader">
+      <div class="panel-header-left">
+        <span class="panel-title" id="timerTitle">타이머</span>
+        <button class="panel-icon-btn" id="timerTitleEdit">✎</button>
+      </div>
+      <div class="panel-header-right">
+        <button class="panel-icon-btn" id="timerMinBtn">-</button>
+      </div>
+    </div>
+
+    <div class="timer-body">
+      <div class="timer-display" id="timerDisplay">00:00:00</div>
+      <div class="timer-controls">
+        <button class="timer-btn-circle" id="btnTimerReset">
+          <span class="timer-btn-icon">↺</span>
+        </button>
+        <button class="timer-btn-circle" id="btnTimerPlayPause">
+          <span class="timer-btn-icon" id="timerPlayIcon">▶</span>
+        </button>
+        <button class="timer-btn-circle" id="btnTimerClose">
+          <span class="timer-btn-icon">✕</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 오늘할일 리스트 패널 -->
+  <div class="todo-panel" id="todoPanel" style="display:none;">
+    <div class="todo-header" id="todoHeader">
+      <div class="todo-header-left">
+        <span class="todo-title" id="todoTitle">오늘할일 리스트</span>
+        <button class="panel-icon-btn" id="todoTitleEdit">✎</button>
+      </div>
+      <div class="todo-header-right">
+        <button class="panel-icon-btn" id="todoMinBtn">-</button>
+        <button class="panel-icon-btn" id="todoCloseBtn">✕</button>
+      </div>
+    </div>
+    <div class="todo-body">
+      <div class="todo-items" id="todoItems"></div>
+      <button class="todo-add" id="todoAddBtn">+ 할 일 추가</button>
+    </div>
+  </div>
+
+</div><!-- /ui-layer -->
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+const canvas3D = document.getElementById('webgl');
+const scene = new THREE.Scene();
+
+/* ===== BGM ===== */
+const bgm = new Audio('bgm.mp3');
+bgm.loop = true;
+bgm.volume = 0.7;
+let bgmStarted = false;
+
+/* 클릭/치트 공용 효과음 */
+const waterSfx = new Audio('water.mp3');
+waterSfx.volume = 0.8;
+
+/* ===== 카메라 ===== */
+const camera = new THREE.PerspectiveCamera(
+  45,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  500
+);
+camera.position.set(18, 4, 10);
+
+const controls = new OrbitControls(camera, canvas3D);
+controls.enableDamping = true;
+controls.target.set(-5, 1, 3);
+controls.update();
+
+/* ===== 렌더러 ===== */
+const renderer = new THREE.WebGLRenderer({
+  canvas: canvas3D,
+  antialias: true,
+  alpha: true
+});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+window.addEventListener('resize', ()=>{
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+});
+
+/* ===== 라이트 ===== */
+scene.add(new THREE.HemisphereLight(0xffffff, 0x335577, 1.1));
+const dir = new THREE.DirectionalLight(0xffffff, 1);
+dir.position.set(15, 25, 10);
+scene.add(dir);
+
+/* ===== 텍스처 로더 ===== */
+const texLoader = new THREE.TextureLoader();
+const gradientMap = texLoader.load(
+  'https://threejs.org/examples/textures/gradientMaps/threeTone.jpg'
+);
+gradientMap.minFilter = THREE.NearestFilter;
+gradientMap.magFilter = THREE.NearestFilter;
+
+const waterTexture = texLoader.load('water.png');
+
+/* ===== Toon Material ===== */
+function applyToonMaterial(root){
+  root.traverse(obj=>{
+    if(!obj.isMesh) return;
+    const old = obj.material || {};
+    const mat = new THREE.MeshToonMaterial({
+      color: old.color ? old.color.clone() : new THREE.Color(0xffffff),
+      map: old.map || null,
+      gradientMap
+    });
+    if(old.transparent) mat.transparent = true;
+    if(typeof old.opacity === 'number') mat.opacity = old.opacity;
+    if(old.skinning || obj.isSkinnedMesh) mat.skinning = true;
+    if(old.morphTargets) mat.morphTargets = true;
+    if(old.morphNormals) mat.morphNormals = true;
+    mat.side = old.side ?? THREE.FrontSide;
+    obj.material = mat;
+  });
+}
+
+/* ===== GLTF 로더 & 모델들 ===== */
+const loader = new GLTFLoader();
+
+let rock;
+let coralTemplate;
+let seaweedTemplate;
+let fishTemplate;
+let blueTangTemplate;
+let yellowTangTemplate;
+let moorishIdolTemplate;
+let jellyfishTemplate1;
+let jellyfishTemplate2;
+
+/* AnimationClips & 믹서들 */
+let fishAnimations        = [];
+let blueTangAnimations    = [];
+let yellowTangAnimations  = [];
+let moorishIdolAnimations = [];
+let jellyfishAnimations1  = [];
+let jellyfishAnimations2  = [];
+let seaweedAnimations     = [];
+const mixers = [];
+
+const coralInstances       = [];
+const seaweedInstances     = [];
+const fishInstances        = [];
+const blueTangInstances    = [];
+const yellowTangInstances  = [];
+const moorishIdolInstances = [];
+const jellyfishInstances   = [];
+
+/* rock */
+loader.load('rock.gltf', gltf=>{
+  rock = gltf.scene;
+  rock.scale.set(8,8,8);
+  rock.position.y = -0.4;
+  applyToonMaterial(rock);
+  scene.add(rock);
+  startBaseAuto();
+});
+
+loader.load('coral.gltf', gltf=>{
+  coralTemplate = gltf.scene;
+  coralTemplate.scale.set(6,6,6);
+  applyToonMaterial(coralTemplate);
+});
+
+loader.load('seaweed.glb', gltf=>{
+  seaweedTemplate = gltf.scene;
+  seaweedTemplate.scale.set(5,5,5);
+  applyToonMaterial(seaweedTemplate);
+  seaweedAnimations = gltf.animations || [];
+});
+
+loader.load('hindoongari.glb', gltf=>{
+  fishTemplate = gltf.scene;
+  fishTemplate.scale.set(2,2,2);
+  applyToonMaterial(fishTemplate);
+  fishAnimations = gltf.animations || [];
+});
+
+loader.load('bluetang.glb', gltf=>{
+  blueTangTemplate = gltf.scene;
+  blueTangTemplate.scale.set(2,2,2);
+  applyToonMaterial(blueTangTemplate);
+  blueTangAnimations = gltf.animations || [];
+});
+
+loader.load('yellowtang.glb', gltf=>{
+  yellowTangTemplate = gltf.scene;
+  yellowTangTemplate.scale.set(2,2,2);
+  applyToonMaterial(yellowTangTemplate);
+  yellowTangAnimations = gltf.animations || [];
+});
+
+loader.load('MoorishIdol.glb', gltf=>{
+  moorishIdolTemplate = gltf.scene;
+  moorishIdolTemplate.scale.set(2,2,2);
+  applyToonMaterial(moorishIdolTemplate);
+  moorishIdolAnimations = gltf.animations || [];
+});
+
+loader.load('jellyfish.glb', gltf=>{
+  jellyfishTemplate1 = gltf.scene;
+  jellyfishTemplate1.scale.set(1,1,1);
+  applyToonMaterial(jellyfishTemplate1);
+  jellyfishTemplate1.traverse(obj=>{
+    if(obj.isMesh && obj.material){
+      obj.material.transparent = true;
+      obj.material.opacity = 0.6;
+      obj.material.emissive = new THREE.Color('#00eaff');
+      obj.material.emissiveIntensity = 0.55;
+    }
+  });
+  jellyfishAnimations1 = gltf.animations || [];
+});
+
+loader.load('jellyfish2.glb', gltf=>{
+  jellyfishTemplate2 = gltf.scene;
+  jellyfishTemplate2.scale.set(1,1,1);
+  applyToonMaterial(jellyfishTemplate2);
+  jellyfishTemplate2.traverse(obj=>{
+    if(obj.isMesh && obj.material){
+      obj.material.transparent = true;
+      obj.material.opacity = 0.6;
+      obj.material.emissive = new THREE.Color('#ff7fd9');
+      obj.material.emissiveIntensity = 0.6;
+    }
+  });
+  jellyfishAnimations2 = gltf.animations || [];
+});
+
+/* 산호 wobble 설정 */
+function setupWobble(obj,{rotAmpMin,rotAmpMax,posAmpMin,posAmpMax,freqMin,freqMax}){
+  obj.userData.wobble = {
+    baseRotZ: obj.rotation.z,
+    basePosZ: obj.position.z,
+    ampRotZ: rotAmpMin + Math.random()*(rotAmpMax-rotAmpMin),
+    ampPosZ: posAmpMin + Math.random()*(posAmpMax-posAmpMin),
+    freq:    freqMin + Math.random()*(freqMax-freqMin),
+    phase:   Math.random()*Math.PI*2
+  };
+}
+
+/* 배치 함수들 */
+function placeCoral(){
+  if(!coralTemplate) return;
+  const c = coralTemplate.clone(true);
+  c.position.set(-1, -1, 3);
+  setupWobble(c,{
+    rotAmpMin:0.01, rotAmpMax:0.02,
+    posAmpMin:0.02, posAmpMax:0.04,
+    freqMin:0.25,  freqMax:0.4
+  });
+  scene.add(c);
+  coralInstances.push(c);
+}
+
+function placeSeaweed(){
+  if(!seaweedTemplate) return;
+  const s = SkeletonUtils.clone(seaweedTemplate);
+  s.position.set(-4, -1, 2.5);
+  scene.add(s);
+  seaweedInstances.push(s);
+  if(seaweedAnimations.length > 0){
+    const mixer = new THREE.AnimationMixer(s);
+    seaweedAnimations.forEach(clip=>{
+      mixer.clipAction(clip).play();
+    });
+    mixers.push(mixer);
+  }
+}
+
+function placeFish(){
+  if(!fishTemplate) return;
+  const f = SkeletonUtils.clone(fishTemplate);
+  f.position.set(-12, -2, 4);
+  scene.add(f);
+  fishInstances.push(f);
+  if(fishAnimations.length > 0){
+    const mixer = new THREE.AnimationMixer(f);
+    fishAnimations.forEach(clip=>{
+      mixer.clipAction(clip).play();
+    });
+    mixers.push(mixer);
+  }
+}
+
+function placeBlueTang(){
+  if(!blueTangTemplate) return;
+  const b = SkeletonUtils.clone(blueTangTemplate);
+  b.position.set(-15, -5, 3.2);
+  scene.add(b);
+  blueTangInstances.push(b);
+  if(blueTangAnimations.length > 0){
+    const mixer = new THREE.AnimationMixer(b);
+    blueTangAnimations.forEach(clip=>{
+      mixer.clipAction(clip).play();
+    });
+    mixers.push(mixer);
+  }
+}
+
+function placeYellowTang(){
+  if(!yellowTangTemplate) return;
+  const y = SkeletonUtils.clone(yellowTangTemplate);
+  y.position.set(-8, -2, -6);
+  scene.add(y);
+  yellowTangInstances.push(y);
+  if(yellowTangAnimations.length > 0){
+    const mixer = new THREE.AnimationMixer(y);
+    yellowTangAnimations.forEach(clip=>{
+      mixer.clipAction(clip).play();
+    });
+    mixers.push(mixer);
+  }
+}
+
+function placeMoorishIdol(){
+  if(!moorishIdolTemplate) return;
+  const m = SkeletonUtils.clone(moorishIdolTemplate);
+  m.position.set(-10, -2, -3);
+  scene.add(m);
+  moorishIdolInstances.push(m);
+  if(moorishIdolAnimations.length > 0){
+    const mixer = new THREE.AnimationMixer(m);
+    moorishIdolAnimations.forEach(clip=>{
+      mixer.clipAction(clip).play();
+    });
+    mixers.push(mixer);
+  }
+}
+
+/* 해파리 글로우 스프라이트 */
+function createGlowSprite(colorHex){
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const grd = ctx.createRadialGradient(
+    size*0.5, size*0.5, 0,
+    size*0.5, size*0.5, size*0.5
+  );
+  grd.addColorStop(0.0, 'rgba(255,255,255,0.45)');
+  grd.addColorStop(0.35,'rgba(255,255,255,0.35)');
+  grd.addColorStop(0.7, 'rgba(255,255,255,0.12)');
+  grd.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+
+  ctx.fillStyle = grd;
+  ctx.fillRect(0,0,size,size);
+
+  const tex = new THREE.Texture(canvas);
+  tex.needsUpdate = true;
+
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    color: new THREE.Color(colorHex),
+    transparent:true,
+    opacity:0.6,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+
+  return new THREE.Sprite(mat);
+}
+
+function placeJellyfish(){
+  if(!jellyfishTemplate1 && !jellyfishTemplate2) return;
+
+  const basePositions = [
+    new THREE.Vector3(-20.0, 3, 10),
+    new THREE.Vector3(  2.5, 0.7, 2.8)
+  ];
+
+  basePositions.forEach((pos, idx)=>{
+    const baseTemplate = idx === 0 ? jellyfishTemplate1 : jellyfishTemplate2;
+    if(!baseTemplate) return;
+
+    const j = SkeletonUtils.clone(baseTemplate);
+    j.position.copy(pos);
+
+    if(idx === 1){
+      j.scale.x *= -1;
+    }
+    if(idx === 0){
+      j.scale.multiplyScalar(1.4);
+    }else{
+      j.scale.multiplyScalar(0.75);
+    }
+
+    let speed, amp, phase;
+    if(idx === 0){
+      speed = 0.55;
+      amp   = 0.7;
+      phase = Math.random()*Math.PI*2;
+    }else{
+      speed = 0.9;
+      amp   = 0.35;
+      phase = Math.random()*Math.PI*2 + Math.PI/2;
+    }
+
+    j.userData.float = {
+      baseY: j.position.y,
+      speed,
+      amp,
+      offset: phase
+    };
+
+    const color = idx === 0 ? '#00eaff' : '#ff7fd9';
+    const glowSprite = createGlowSprite(color);
+
+    const baseScale = (idx === 0) ? 3.6 : 2.4;
+    glowSprite.scale.set(baseScale, baseScale, baseScale);
+    glowSprite.position.set(0, 0.4, 0);
+    j.add(glowSprite);
+
+    j.userData.glow = {
+      sprite: glowSprite,
+      baseScale,
+      baseOpacity: 0.45,
+      phase: Math.random()*Math.PI*2
+    };
+
+    const clips = idx === 0 ? jellyfishAnimations1 : jellyfishAnimations2;
+    if(clips && clips.length){
+      const mixer = new THREE.AnimationMixer(j);
+      clips.forEach(clip=>{
+        mixer.clipAction(clip).play();
+      });
+      mixers.push(mixer);
+    }
+
+    scene.add(j);
+    jellyfishInstances.push(j);
+  });
+}
+
+/* coral 위 +10 sprite */
+function makeTextSprite(text){
+  const canvas = document.createElement('canvas');
+  const size = 256;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0,0,size,size);
+  ctx.font = '400 110px "Escoredream", system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'white';
+  ctx.fillText(text, size * 0.5, size * 0.52);
+
+  const tex = new THREE.Texture(canvas);
+  tex.needsUpdate = true;
+
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent:true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(1.0,1.0,1.0);
+  return sprite;
+}
+
+const floatingLabels = [];
+
+function showWaterGainAt(pos, amount){
+  const group = new THREE.Group();
+
+  const iconMat = new THREE.SpriteMaterial({
+    map: waterTexture,
+    transparent:true,
+    opacity:1
+  });
+  const icon = new THREE.Sprite(iconMat);
+  icon.scale.set(0.55,0.55,0.55);
+  icon.position.set(-0.65,0,0);
+  group.add(icon);
+
+  const textSprite = makeTextSprite(`+${amount}`);
+  textSprite.position.set(0.65,0,0);
+  group.add(textSprite);
+
+  group.position.copy(pos).add(new THREE.Vector3(0,2.0,0));
+  group.userData.startTime = clock.getElapsedTime();
+  floatingLabels.push(group);
+  scene.add(group);
+}
+
+/* 상단 클릭 이펙트 */
+const clickGains = document.getElementById('clickGains');
+function spawnClickGain(amount){
+  const el = document.createElement('div');
+  el.className = 'click-gain';
+  el.innerHTML = `<img src="water.png" alt=""><span>+${amount}</span>`;
+  const offset = (Math.random() - 0.5) * 40;
+  el.style.left = `calc(50% + ${offset}px)`;
+  clickGains.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 700);
+}
+
+/* 버블 */
+const bubbleGroup = new THREE.Group();
+scene.add(bubbleGroup);
+const bubbles = [];
+const bubbleData = [];
+const AREA = { minX:-40, maxX:40, minZ:-10, maxZ:25, minY:-2, maxY:6 };
+const BUBBLE_COUNT = 260;
+
+function bubbleSize(){ return 0.05 + Math.random()*0.07; }
+
+const bubbleMat = new THREE.MeshBasicMaterial({
+  color:0xffffff,
+  transparent:true,
+  opacity:0.6
+});
+
+for(let i=0;i<BUBBLE_COUNT;i++){
+  const geom = new THREE.SphereGeometry(bubbleSize(),12,12);
+  const mesh = new THREE.Mesh(geom, bubbleMat);
+
+  mesh.position.set(
+    AREA.minX + Math.random()*(AREA.maxX-AREA.minX),
+    AREA.minY + Math.random()*(AREA.maxY-AREA.minY),
+    AREA.minZ + Math.random()*(AREA.maxZ-AREA.minZ)
+  );
+
+  bubbleGroup.add(mesh);
+  bubbles.push(mesh);
+
+  bubbleData.push({
+    speed:0.5+Math.random()*1.2,
+    swayAmp:0.1+Math.random()*0.25,
+    swayFreq:0.5+Math.random()*1.4,
+    phase:Math.random()*Math.PI*2
+  });
+}
+
+/* 애니메이션 루프 */
+const clock = new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t  = clock.getElapsedTime();
+
+  controls.update();
+  mixers.forEach(mixer => mixer.update(dt));
+
+  // 버블
+  for(let i=0;i<bubbles.length;i++){
+    const b = bubbles[i];
+    const d = bubbleData[i];
+    b.position.y += d.speed * dt;
+    b.position.x += Math.sin(t*d.swayFreq + d.phase) * d.swayAmp * dt;
+    if(b.position.y > AREA.maxY){
+      b.position.set(
+        AREA.minX + Math.random()*(AREA.maxX-AREA.minX),
+        AREA.minY,
+        AREA.minZ + Math.random()*(AREA.maxZ-AREA.minZ)
+      );
+    }
+  }
+
+  // 산호 wobble
+  coralInstances.forEach(obj=>{
+    const w = obj.userData.wobble;
+    if(!w) return;
+    const s = Math.sin(t*w.freq + w.phase);
+    obj.rotation.z = w.baseRotZ + s * w.ampRotZ;
+    obj.position.z = w.basePosZ + s * w.ampPosZ;
+  });
+
+  // 해파리 둥둥 + glow sprite 펄스
+  jellyfishInstances.forEach(j=>{
+    const f = j.userData.float;
+    if(f){
+      j.position.y = f.baseY + Math.sin(t * f.speed + f.offset) * f.amp;
+      j.rotation.y += 0.004;
+    }
+    const g = j.userData.glow;
+    if(g && g.sprite){
+      const phase = g.phase;
+      const pulse = 1.0 + Math.sin(t*1.4 + phase)*0.06;
+      g.sprite.scale.set(g.baseScale*pulse, g.baseScale*pulse, g.baseScale*pulse);
+      g.sprite.material.opacity = g.baseOpacity + Math.sin(t*1.4 + phase)*0.12;
+    }
+  });
+
+  // coral floating label fade
+  const duration = 1.2;
+  for(let i=floatingLabels.length-1;i>=0;i--){
+    const g = floatingLabels[i];
+    const life = t - g.userData.startTime;
+    if(life > duration){
+      scene.remove(g);
+      floatingLabels.splice(i,1);
+      continue;
+    }
+    g.position.y += 0.7 * dt;
+    const alpha = 1 - life/duration;
+    g.traverse(obj=>{
+      if(obj.material) obj.material.opacity = alpha;
+    });
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ===== 포인트 & UI ===== */
+let points = 0;
+let clickValue = 1;
+
+function setPoints(v){
+  points = v;
+  document.getElementById('score').textContent =
+    String(points).padStart(8,'0');
+}
+setPoints(0);
+
+/* 시계 표시 */
+setInterval(()=>{
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+},1000);
+
+/* 기본 자동 수입: 돌만 있어도 30초마다 +10 */
+let baseAutoStarted = false;
+function startBaseAuto(){
+  if(baseAutoStarted) return;
+  baseAutoStarted = true;
+  setInterval(()=>{
+    setPoints(points + 10);
+    if(rock){
+      showWaterGainAt(rock.position, 10);
+    }
+  }, 30000);
+}
+
+/* 클릭: 효과음 + 포인트 */
+document.addEventListener('pointerdown', e=>{
+  if(!bgmStarted){
+    bgmStarted = true;
+    bgm.play().catch(err=> console.log('bgm play failed', err));
+  }
+
+  // 메인 화면 클릭 시 물 소리 + 포인트
+  if(!e.target.closest('.ui-layer') && !e.target.closest('.popup') && !e.target.closest('.intro-overlay') && !e.target.closest('.cheat-overlay')){
+    try{
+      waterSfx.currentTime = 0;
+      waterSfx.play();
+    }catch(err){}
+    setPoints(points + clickValue);
+    spawnClickGain(clickValue);
+  }
+});
+
+/* 상점 로직 */
+const btnShop = document.getElementById('btnShop');
+const shopPopup = document.getElementById('shopPopup');
+const shopClose = document.getElementById('shopClose');
+const goods = document.getElementById('goods');
+
+btnShop.onclick = ()=> shopPopup.classList.toggle('open');
+shopClose.onclick = ()=> shopPopup.classList.remove('open');
+
+let coralOwned       = false;
+let seaweedOwned     = false;
+let fishOwned        = false;
+let blueTangOwned    = false;
+let yellowTangOwned  = false;
+let moorishIdolOwned = false;
+let jellyfishOwned   = false;
+
+let coralIntervalId       = null;
+let fishIntervalId        = null;
+let blueTangIntervalId    = null;
+let yellowTangIntervalId  = null;
+let moorishIdolIntervalId = null;
+
+goods.onclick = e=>{
+  const card = e.target.closest('.item');
+  if(!card || card.classList.contains('owned')) return;
+
+  const key = card.dataset.key;
+  const price = Number(card.dataset.price);
+  if(points < price) return;
+
+  if(key === 'coral'){
+    setPoints(points - price);
+    card.classList.add('owned');
+    coralOwned = true;
+    placeCoral();
+
+    const seaweedCard = goods.querySelector('.item[data-key="seaweed"]');
+    if(seaweedCard) seaweedCard.classList.remove('locked');
+
+    if(!coralIntervalId){
+      coralIntervalId = setInterval(()=>{
+        setPoints(points + 50);
+        if(coralInstances.length > 0){
+          showWaterGainAt(coralInstances[0].position, 50);
+        }
+      }, 60000); // 1분마다 +50
+    }
+  }
+
+  if(key === 'seaweed'){
+    if(!coralOwned) return;
+    setPoints(points - price);
+    card.classList.add('owned');
+    seaweedOwned = true;
+    placeSeaweed();
+    clickValue = 5; // 클릭 시 +5
+
+    const fishCard = goods.querySelector('.item[data-key="fish"]');
+    if(fishCard) fishCard.classList.remove('locked');
+  }
+
+  if(key === 'fish'){
+    if(!seaweedOwned) return;
+    setPoints(points - price);
+    card.classList.add('owned');
+    fishOwned = true;
+    placeFish();
+
+    const blueCard = goods.querySelector('.item[data-key="bluetang"]');
+    if(blueCard) blueCard.classList.remove('locked');
+
+    if(!fishIntervalId){
+      fishIntervalId = setInterval(()=>{
+        setPoints(points + 30);
+        if(fishInstances.length > 0){
+          showWaterGainAt(fishInstances[0].position, 30);
+        }
+      }, 30000); // 30초마다 +30
+    }
+  }
+
+  if(key === 'bluetang'){
+    if(!fishOwned) return;
+    setPoints(points - price);
+    card.classList.add('owned');
+    blueTangOwned = true;
+    placeBlueTang();
+
+    const yellowCard = goods.querySelector('.item[data-key="yellowtang"]');
+    if(yellowCard) yellowCard.classList.remove('locked');
+
+    if(!blueTangIntervalId){
+      blueTangIntervalId = setInterval(()=>{
+        setPoints(points + 40);
+        if(blueTangInstances.length > 0){
+          showWaterGainAt(blueTangInstances[0].position, 40);
+        }
+      }, 30000); // 30초마다 +40
+    }
+  }
+
+  if(key === 'yellowtang'){
+    if(!blueTangOwned) return;
+    setPoints(points - price);
+    card.classList.add('owned');
+    yellowTangOwned = true;
+    placeYellowTang();
+
+    const moorishCard = goods.querySelector('.item[data-key="moorishidol"]');
+    if(moorishCard) moorishCard.classList.remove('locked');
+
+    if(!yellowTangIntervalId){
+      yellowTangIntervalId = setInterval(()=>{
+        setPoints(points + 100);
+        if(yellowTangInstances.length > 0){
+          showWaterGainAt(yellowTangInstances[0].position, 100);
+        }
+      }, 60000); // 1분마다 +100
+    }
+  }
+
+  if(key === 'moorishidol'){
+    if(!yellowTangOwned) return;
+    setPoints(points - price);
+    card.classList.add('owned');
+    moorishIdolOwned = true;
+    placeMoorishIdol();
+
+    const jellyCard = goods.querySelector('.item[data-key="jellyfish"]');
+    if(jellyCard) jellyCard.classList.remove('locked');
+
+    if(!moorishIdolIntervalId){
+      moorishIdolIntervalId = setInterval(()=>{
+        setPoints(points + 150);
+        if(moorishIdolInstances.length > 0){
+          showWaterGainAt(moorishIdolInstances[0].position, 150);
+        }
+      }, 60000); // 1분마다 +150
+    }
+  }
+
+  if(key === 'jellyfish'){
+    if(!moorishIdolOwned) return;
+    setPoints(points - price);
+    card.classList.add('owned');
+    jellyfishOwned = true;
+    placeJellyfish();
+    clickValue += 15; // 클릭 추가 +15
+  }
+};
+
+/* 인트로 팝업 제어 */
+const introOverlay = document.getElementById('introOverlay');
+const introStart   = document.getElementById('introStart');
+
+if(introOverlay && introStart){
+  introStart.addEventListener('click', ()=>{
+    introOverlay.classList.add('hidden');
+  });
+}
+
+/* 치트 버튼 / 팝업 */
+const cheatBtn      = document.getElementById('cheatBtn');
+const cheatOverlay  = document.getElementById('cheatOverlay');
+const cheatConfirm  = document.getElementById('cheatConfirm');
+const cheatCancel   = document.getElementById('cheatCancel');
+
+cheatBtn.addEventListener('click', ()=>{
+  try{
+    waterSfx.currentTime = 0;
+    waterSfx.play();
+  }catch(e){}
+  cheatOverlay.classList.add('open');
+});
+cheatCancel.addEventListener('click', ()=>{
+  cheatOverlay.classList.remove('open');
+});
+cheatConfirm.addEventListener('click', ()=>{
+  setPoints(99999999);
+  cheatOverlay.classList.remove('open');
+});
+
+/* 공통 드래그 함수 */
+function makeDraggable(panel, handle){
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  handle.addEventListener('pointerdown', e=>{
+    if(e.target.closest('button')) return;
+    dragging = true;
+    const rect = panel.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    panel.style.transition = "none";
+    handle.setPointerCapture(e.pointerId);
+  });
+
+  handle.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const x = e.clientX - offsetX;
+    const y = e.clientY - offsetY;
+    panel.style.left = x + "px";
+    panel.style.top  = y + "px";
+  });
+
+  handle.addEventListener('pointerup', e=>{
+    dragging = false;
+    try{ handle.releasePointerCapture(e.pointerId); }catch(_){}
+  });
+}
+
+/* 상점 팝업도 이동 가능하게 */
+const shopHeader = document.querySelector('#shopPopup .pop-hd');
+if(shopHeader) makeDraggable(shopPopup, shopHeader);
+
+/* 타이머 로직 */
+const timerPanel   = document.getElementById('timerPanel');
+const timerHeader  = document.getElementById('timerHeader');
+const timerDisplay = document.getElementById('timerDisplay');
+const timerTitle   = document.getElementById('timerTitle');
+const timerTitleEdit = document.getElementById('timerTitleEdit');
+const timerMinBtn  = document.getElementById('timerMinBtn');
+const btnTimerIcon = document.getElementById('timerPlayIcon');
+const btnTimerReset = document.getElementById('btnTimerReset');
+const btnTimerPlayPause = document.getElementById('btnTimerPlayPause');
+const btnTimerClose = document.getElementById('btnTimerClose');
+const btnTimerDock = document.getElementById('btnTimer');
+
+makeDraggable(timerPanel, timerHeader);
+
+btnTimerDock.addEventListener('click', ()=>{
+  if(timerPanel.style.display === 'none' || timerPanel.style.display === ''){
+    timerPanel.style.display = 'block';
+  }else{
+    timerPanel.style.display = 'none';
+  }
+});
+
+let timerRunning = false;
+let timerStart   = 0;
+let timerElapsed = 0;
+let timerInterval = null;
+
+function formatTimer(ms){
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const hh = String(h).padStart(2,'0');
+  const mm = String(m).padStart(2,'0');
+  const ss = String(s).padStart(2,'0');
+  return `${hh}:${mm}:${ss}`;
+}
+function updateTimerDisplay(){
+  timerDisplay.textContent = formatTimer(timerElapsed);
+}
+
+btnTimerPlayPause.addEventListener('click', ()=>{
+  if(!timerRunning){
+    timerRunning = true;
+    timerStart = performance.now() - timerElapsed;
+    timerInterval = setInterval(()=>{
+      timerElapsed = performance.now() - timerStart;
+      updateTimerDisplay();
+    }, 50);
+    btnTimerIcon.textContent = '⏸';
+  }else{
+    timerRunning = false;
+    clearInterval(timerInterval);
+    btnTimerIcon.textContent = '▶';
+  }
+});
+
+btnTimerReset.addEventListener('click', ()=>{
+  timerElapsed = 0;
+  if(timerRunning){
+    timerStart = performance.now();
+  }
+  updateTimerDisplay();
+});
+
+btnTimerClose.addEventListener('click', ()=>{
+  timerRunning = false;
+  clearInterval(timerInterval);
+  timerPanel.style.display = 'none';
+});
+
+timerMinBtn.addEventListener('click', ()=>{
+  timerPanel.classList.toggle('collapsed');
+});
+
+timerTitleEdit.addEventListener('click', ()=>{
+  const editing = timerTitle.getAttribute('contenteditable') === 'true';
+  if(!editing){
+    timerTitle.setAttribute('contenteditable','true');
+    timerTitle.focus();
+  }else{
+    timerTitle.removeAttribute('contenteditable');
+  }
+});
+
+/* 메모 생성 로직 */
+const btnMemo = document.getElementById('btnMemo');
+let memoCount = 0;
+
+function createMemo(x = 80, y = 220){
+  memoCount++;
+  const panel = document.createElement('div');
+  panel.className = 'memo-panel';
+  panel.style.left = x + 'px';
+  panel.style.top  = y + 'px';
+
+  panel.innerHTML = `
+    <div class="memo-header">
+      <div class="memo-header-left">
+        <span class="memo-title">메모${memoCount}</span>
+        <button class="panel-icon-btn memo-edit">✎</button>
+      </div>
+      <div class="memo-header-right">
+        <button class="panel-icon-btn memo-min">-</button>
+        <button class="panel-icon-btn memo-close">✕</button>
+      </div>
+    </div>
+    <div class="memo-body">
+      <textarea maxlength="200" placeholder="메모를 입력하세요 (최대 200자)"></textarea>
+      <div class="memo-count"><span>0</span>/200</div>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+
+  const header = panel.querySelector('.memo-header');
+  const title  = panel.querySelector('.memo-title');
+  const editBtn = panel.querySelector('.memo-edit');
+  const minBtn  = panel.querySelector('.memo-min');
+  const closeBtn= panel.querySelector('.memo-close');
+  const textarea = panel.querySelector('textarea');
+  const countSpan = panel.querySelector('.memo-count span');
+
+  makeDraggable(panel, header);
+
+  editBtn.addEventListener('click', ()=>{
+    const editing = title.getAttribute('contenteditable') === 'true';
+    if(!editing){
+      title.setAttribute('contenteditable','true');
+      title.focus();
+    }else{
+      title.removeAttribute('contenteditable');
+    }
+  });
+
+  minBtn.addEventListener('click', ()=>{
+    panel.classList.toggle('collapsed');
+  });
+
+  closeBtn.addEventListener('click', ()=>{
+    panel.remove();
+  });
+
+  textarea.addEventListener('input', ()=>{
+    const len = textarea.value.length;
+    if(len > 200){
+      textarea.value = textarea.value.slice(0,200);
+    }
+    countSpan.textContent = textarea.value.length;
+  });
+
+  return panel;
+}
+
+btnMemo.addEventListener('click', ()=>{
+  const baseX = 80 + Math.random()*60;
+  const baseY = 220 + Math.random()*60;
+  createMemo(baseX, baseY);
+});
+
+/* 체크리스트 (오늘할일 리스트) – 토글형 단일 패널 */
+const btnTodoDock   = document.getElementById('btnTodo');
+const todoPanel     = document.getElementById('todoPanel');
+const todoHeader    = document.getElementById('todoHeader');
+const todoTitle     = document.getElementById('todoTitle');
+const todoTitleEdit = document.getElementById('todoTitleEdit');
+const todoMinBtn    = document.getElementById('todoMinBtn');
+const todoCloseBtn  = document.getElementById('todoCloseBtn');
+const todoItems     = document.getElementById('todoItems');
+const todoAddBtn    = document.getElementById('todoAddBtn');
+
+makeDraggable(todoPanel, todoHeader);
+
+btnTodoDock.addEventListener('click', ()=>{
+  if(todoPanel.style.display === 'none' || todoPanel.style.display === ''){
+    todoPanel.style.display = 'block';
+  }else{
+    todoPanel.style.display = 'none';
+  }
+});
+
+todoTitleEdit.addEventListener('click', ()=>{
+  const editing = todoTitle.getAttribute('contenteditable') === 'true';
+  if(!editing){
+    todoTitle.setAttribute('contenteditable','true');
+    todoTitle.focus();
+  }else{
+    todoTitle.removeAttribute('contenteditable');
+  }
+});
+
+todoMinBtn.addEventListener('click', ()=>{
+  todoPanel.classList.toggle('collapsed');
+});
+
+todoCloseBtn.addEventListener('click', ()=>{
+  todoPanel.style.display = 'none';
+});
+
+function addTodoItem(initialText='할 일을 입력하세요'){
+  if(todoItems.children.length >= 20) return; // 최대 20개
+  const item = document.createElement('div');
+  item.className = 'todo-item';
+  item.innerHTML = `
+    <input type="checkbox" class="todo-check">
+    <span class="todo-text" contenteditable="true">${initialText}</span>
+    <button class="todo-del">✕</button>
+  `;
+
+  const checkbox = item.querySelector('.todo-check');
+  const textSpan = item.querySelector('.todo-text');
+  const delBtn   = item.querySelector('.todo-del');
+
+  checkbox.addEventListener('change', ()=>{
+    if(checkbox.checked){
+      textSpan.style.textDecoration = 'line-through';
+      textSpan.style.opacity = '0.7';
+    }else{
+      textSpan.style.textDecoration = 'none';
+      textSpan.style.opacity = '0.87';
+    }
+  });
+
+  // 텍스트 더블클릭 시 전체 선택
+  textSpan.addEventListener('dblclick', ()=>{
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(textSpan);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+
+  delBtn.addEventListener('click', ()=>{
+    item.remove();
+  });
+
+  todoItems.appendChild(item);
+}
+
+todoAddBtn.addEventListener('click', ()=>{
+  addTodoItem('할 일을 입력하세요');
+});
+
+// 기본 항목 하나
+addTodoItem();
+
+/* 초기 타이머 표시 */
+updateTimerDisplay();
+
+</script>
+
+</body>
+</html>
